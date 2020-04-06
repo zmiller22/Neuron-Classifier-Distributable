@@ -89,3 +89,8 @@ def choosePath():
         print ("Selected Path: %s" % chosendir)
         
     return chosendir
+
+def wrapper(func, *args, **kwargs):
+    def wrapped():
+        return func(*args, **kwargs)
+    return wrapped

@@ -11,9 +11,11 @@ Wroking with python version 3.6+
 
 import numpy as np
 import pandas as pd
+from scipy import sparse
 
 import os
 import argparse
+import timeit
 
 
 import helper_functions as my_func
@@ -80,7 +82,7 @@ def getSomaPoint(nrn_df):
     
     return soma_point
 
-def getNeuriteTerminationPoints(nrn_df, dims=None, embed_into_img=False):
+def getNeuriteTerminationPoints(nrn_df):
     #TODO document
     values = nrn_df.values
     sample_nums = values[:,0]
@@ -90,21 +92,30 @@ def getNeuriteTerminationPoints(nrn_df, dims=None, embed_into_img=False):
     end_point_idxs = np.nonzero(np.in1d(sample_nums, end_point_rows))[0]
     end_points = values[end_point_idxs, 2:5]
     
-    end_points = np.around(end_points).astype(int)
-    
-    if embed_into_img==False:
-        return end_points
-    
-    elif embed_into_img==True:
-        empty_img = np.zeros((dims))
-        return empty_img
+    return end_points    
 
-    
-
-def getNeuriteTerminationCounts(nrn_dict, mask_dict):
+def getNeuriteTerminationCounts(nrn_dict, mask_dict, dims):
     # take in a nrn_dict and a mask_dict and find the number of termination
     # points in each part of the mask, and add that to a df
-    pass
+    
+    # Get a dict of neurite terminations points embedded into a sparse matrix
+    # this is wayyyyy to slow. Also, it looks like either I am doing something
+    # wrong with pixel/real space coordinate differences, or 
+    end_point_img_dict = {}
+    for key in nrn_dict.keys():
+        #print(key)
+        end_points = getNeuriteTerminationPoints(nrn_dict[key])
+        end_points = np.around(end_points).astype(int)
+        end_point_img = np.zeros((dims))
+        print(end_points)
+
+        #end_point_img[end_points[:,2], end_points[:,1], end_points[:,0]] += 1
+            
+        end_point_img = sparse.coo_matrix(end_point_img.reshape(dims[0],-1))
+        end_point_img_dict.update( {key : end_point_img} )
+    
+    return None
+    
 
 #%% Functionality when run as a script
 if __name__ == '__main__':
