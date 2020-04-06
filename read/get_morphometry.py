@@ -6,6 +6,7 @@ Created on Tue Mar 24 14:44:00 2020
 @author: Zachary Miller
 
 Working with NeuroM version 1.4.15
+Wroking with python version 3.6+
 """
 
 import numpy as np
@@ -19,7 +20,7 @@ import helper_functions as my_func
 
 class NeuronGroup:
     def __init__(self):
-        self.nrn_list = []
+        self.nrn_dict = {}
         self.morphometry_data = None
         
     def loadNeurons(self, dir_path, nrn_names=None):
@@ -30,9 +31,10 @@ class NeuronGroup:
         
         for filename in filenames:
             file_path = dir_path + '/' + filename
+            nrn_name = os.path.splitext(filename)[0]
             nrn_df = pd.read_csv(file_path, header=None, comment='#',
                                  delim_whitespace=True)
-            self.nrn_list.append((nrn_df, os.path.splitext(filename)[0]))
+            self.nrn_dict.update( {nrn_name : nrn_df} )
             
     def loadNeuron(self, file_path, nrn_name=None):
         #TODO give option to specify neuron name
@@ -40,19 +42,22 @@ class NeuronGroup:
         nrn_name = os.path.splitext(os.path.basename(file_path))[0]
         nrn_df = pd.read_csv(file_path, header=None, comment="#",
                          delim_whitespace=True)
-        self.nrn_list.append((nrn_df, nrn_name))
+        self.nrn_dict.update( {nrn_name : nrn_df} )
+        
+    def getLMeasureData():
+        #TODO This should be a command that gets all of the morphometry
+        # data for this NeuronGroup and returns a nice dataframe or combines
+        # it by row name with an existing morphometry dataframe
+        pass
+    
+    def getSpatialData():
+        pass
         
     def loadExternalMorphometry():
         #TODO write a function that allows users to either set the morphometry
         # data to be an external dataframe (if morphometry_data==None) or 
         # combine the external morphometry data with the current morphometry
         # data by row name
-        pass
-    
-    def getMorphometryData():
-        #TODO This should be a command that gets all of the morphometry
-        # data for this NeuronGroup and returns a nice dataframe or combines
-        # it by row name with an existing morphometry dataframe
         pass
 
         
@@ -75,7 +80,7 @@ def getSomaPoint(nrn_df):
     
     return soma_point
 
-def getNeuriteTerminationPoints(nrn_df):
+def getNeuriteTerminationPoints(nrn_df, dims=None, embed_into_img=False):
     #TODO document
     values = nrn_df.values
     sample_nums = values[:,0]
@@ -85,8 +90,21 @@ def getNeuriteTerminationPoints(nrn_df):
     end_point_idxs = np.nonzero(np.in1d(sample_nums, end_point_rows))[0]
     end_points = values[end_point_idxs, 2:5]
     
-    return end_points
+    end_points = np.around(end_points).astype(int)
+    
+    if embed_into_img==False:
+        return end_points
+    
+    elif embed_into_img==True:
+        empty_img = np.zeros((dims))
+        return empty_img
 
+    
+
+def getNeuriteTerminationCounts(nrn_dict, mask_dict):
+    # take in a nrn_dict and a mask_dict and find the number of termination
+    # points in each part of the mask, and add that to a df
+    pass
 
 #%% Functionality when run as a script
 if __name__ == '__main__':
