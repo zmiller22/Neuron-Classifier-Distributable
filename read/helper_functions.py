@@ -78,6 +78,31 @@ def getMasks(mask_dir_path):
     
     return mask_dict, original_dims
 
+def trimIndexRange(array, idx_range):
+    # Edit all elements of an input nx3 point array to be in the range of 0 and
+    # each element of trim_range by column so that all points will be valid 
+    # indices of a 3d array with dimensions trim_range
+    #TODO comment and document
+    
+    # Rescale all high elements
+    for i in range(array.shape[1]):
+        high_idxs = array[:,i]>=idx_range[i]
+        array[high_idxs,i] = idx_range[i]-1
+    
+    # Rescale all low elements    
+    array[array<0] = 0
+    
+    return array
+
+def convertIndex(coord, dims):
+    # Converts a 3d index into a 2d index to allow for indexing of flattened
+    # sparse arrays from 3d coordinate
+    #TODO document
+    new_coord = np.array([coord[0], coord[1]+coord[2]*dims[1]])
+    
+    return new_coord
+        
+
 def choosePath():
     #TODO comment and document
     root = tkinter.Tk()

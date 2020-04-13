@@ -100,19 +100,27 @@ def getNeuriteTerminationCounts(nrn_dict, mask_dict, dims):
     
     # Get a dict of neurite terminations points embedded into a sparse matrix
     # this is wayyyyy to slow. Also, it looks like either I am doing something
-    # wrong with pixel/real space coordinate differences, or 
-    end_point_img_dict = {}
+    # wrong with pixel/real space coordinate differences. 
+    
+    # Get a dict of all neuron names and end points
+    end_point_dict = {}
     for key in nrn_dict.keys():
         #print(key)
         end_points = getNeuriteTerminationPoints(nrn_dict[key])
         end_points = np.around(end_points).astype(int)
-        end_point_img = np.zeros((dims))
-        print(end_points)
+        end_points = my_func.trimIndexRange(end_points, dims)
+        end_point_dict.update( {key : end_points} )
+        
+    # Iterate over each mask and add the resulting values to a dataframe
+        
+        
+        # end_point_img = np.zeros((dims))
+        # print(end_points)
 
-        #end_point_img[end_points[:,2], end_points[:,1], end_points[:,0]] += 1
+        # #end_point_img[end_points[:,2], end_points[:,1], end_points[:,0]] += 1
             
-        end_point_img = sparse.coo_matrix(end_point_img.reshape(dims[0],-1))
-        end_point_img_dict.update( {key : end_point_img} )
+        # end_point_img = sparse.coo_matrix(end_point_img.reshape(dims[0],-1))
+        # end_point_img_dict.update( {key : end_point_img} )
     
     return None
     
