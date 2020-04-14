@@ -98,8 +98,14 @@ def convertIndex(coord, dims):
     # Converts a 3d index into a 2d index to allow for indexing of flattened
     # sparse arrays from 3d coordinate
     #TODO document
-    new_coord = np.array([coord[0], coord[1]+coord[2]*dims[1]])
     
+    if len(coord.shape) == 1:
+        new_coord = np.array([coord[0], coord[1]+coord[2]*dims[1]]).T
+        
+    elif len(coord.shape) == 2:
+        new_coord = np.array([coord[:,0], coord[:,1]+coord[:,2]*dims[1]]).T
+    
+    else: return None
     return new_coord
         
 

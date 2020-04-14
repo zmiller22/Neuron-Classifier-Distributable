@@ -18,7 +18,7 @@ import argparse
 import timeit
 
 
-import helper_functions as my_func
+import read.helper_functions as my_func
 
 class NeuronGroup:
     def __init__(self):
@@ -94,6 +94,20 @@ def getNeuriteTerminationPoints(nrn_df):
     
     return end_points    
 
+def getMaskPointCounts(point_arr, mask, dims):
+    # Given an nx3 array of points and a mask, gets the count of points in the mask
+    # where the mask is a scipy coo sparse matrix
+    mask = mask.tocsr()
+    coords = my_func.convertIndex(point_arr, dims)
+    # point_count = 0
+    point_count = np.sum(mask[coords[:,0],coords[:,1]])
+    
+    
+    # for coord in my_func.convertIndex(point_arr, dims):
+    #     point_count += mask[coord[0], coord[1]]
+    
+    return point_count
+
 def getNeuriteTerminationCounts(nrn_dict, mask_dict, dims):
     # take in a nrn_dict and a mask_dict and find the number of termination
     # points in each part of the mask, and add that to a df
@@ -102,27 +116,41 @@ def getNeuriteTerminationCounts(nrn_dict, mask_dict, dims):
     # this is wayyyyy to slow. Also, it looks like either I am doing something
     # wrong with pixel/real space coordinate differences. 
     
+    # Create an empty dataframe
+    NTC_df = pd.DataFrame(np.nan, index=list(nrn_dict.keys()),
+                          columns=list(mask_dict.keys()))
+    print(NTC_df)
+    
     # Get a dict of all neuron names and end points
     end_point_dict = {}
     for key in nrn_dict.keys():
         #print(key)
         end_points = getNeuriteTerminationPoints(nrn_dict[key])
         end_points = np.around(end_points).astype(int)
+        
+        # Limit indexing to the dimensions of the image so index errors are not
+        # thrown for poorly registered neurons, alternatively can clean all 
+        # neuron files before hand so no bad ones make it, but this may bias
+        # for neurons that are not near the edges of the image
         end_points = my_func.trimIndexRange(end_points, dims)
+        
         end_point_dict.update( {key : end_points} )
         
     # Iterate over each mask and add the resulting values to a dataframe
-        
-        
-        # end_point_img = np.zeros((dims))
-        # print(end_points)
-
-        # #end_point_img[end_points[:,2], end_points[:,1], end_points[:,0]] += 1
-            
-        # end_point_img = sparse.coo_matrix(end_point_img.reshape(dims[0],-1))
-        # end_point_img_dict.update( {key : end_point_img} )
+    test_list = []
+    i=0
+    for mask_key in mask_dict.keys():
+        mask_arr = mask_dict[mask_key]
+        for end_points_key in end_point_dict.keys():
+            i+=1
+            end_points = end_point_dict[end_points_key]
+            point_count = getMaskPointCounts(end_points, mask_arr, dims)
+            print(f'iteration {i}')
+            print(point_count)
+            test_list.append(point_count)
+            NTC_df.at[end_points_key, mask_key] = point_count
     
-    return None
+    return test_list, NTC_df
     
 
 #%% Functionality when run as a script
