@@ -46,12 +46,13 @@ def getFilenames(dir_path, remove_file_ext=False):
     return filename_list
 
 def getMasks(mask_dir_path):
+    #TODO parallalize and optimize for load speed
     #TODO document
     
     mask_dict = {}
     original_dims = 0
     
-    # Iterate over all the masks in the directory, skipping and subdirectories
+    # Iterate over all the masks in the directory, skipping any subdirectories
     mask_dir = os.fsencode(mask_dir_path)
     for mask_file in os.listdir(mask_dir):
         filename = os.fsdecode(mask_file)
@@ -61,51 +62,56 @@ def getMasks(mask_dir_path):
             
             # Read in each mask as a boolean array 
             mask = si.io.imread(file_path).astype(bool)
-            dims = mask.shape
+            if original_dims==0:
+                original_dims = mask.shape
             
             # Store the mask as a sparse matrix, reshaping first if necessary
-            if len(dims) == 3:
-                mask = sparse.coo_matrix(mask.reshape(dims[0],-1))
-                
-            else: 
-                print("Error: Invalid Image Dimensions")
-                return None
+            mask = sparse.coo_matrix(mask.reshape(mask.shape[0],-1))
             
             #TODO trim the file extension off of filename
             mask_dict.update( {mask_name : mask } )
-            
-    original_dims = dims     
     
     return mask_dict, original_dims
 
-def trimIndexRange(array, idx_range):
-    # Edit all elements of an input nx3 point array to be in the range of 0 and
-    # each element of trim_range by column so that all points will be valid 
-    # indices of a 3d array with dimensions trim_range
+def trimIndexRange(array, zyx_dims):
+    # Edit all elements of an input nx3 array such that each row of the array
+    # will be valid (x,y,z) indices for an image with zyx_dims
     #TODO comment and document
+    
+    idx_cap = zyx_dims[::-1]
     
     # Rescale all high elements
     for i in range(array.shape[1]):
-        high_idxs = array[:,i]>=idx_range[i]
-        array[high_idxs,i] = idx_range[i]-1
+        cap = idx_cap[i]
+        array[ array[:,i]>=cap ] = cap-1
+        # high_idxs = array[:,i]>=cap
+        # array[high_idxs,i] = cap-1
     
     # Rescale all low elements    
     array[array<0] = 0
     
     return array
 
-def convertIndex(coord, dims):
+def convertIndex(coord, zyx_dims):
     # Converts a 3d index into a 2d index to allow for indexing of flattened
     # sparse arrays from 3d coordinate
+    
+    # Note that you need to keep track of dims...
+    
+    # This is currently broken, tested convering 3d coords with known value into
+    # 2d coords and got back wrong value
+    
     #TODO document
     
     if len(coord.shape) == 1:
-        new_coord = np.array([coord[0], coord[1]+coord[2]*dims[1]]).T
+        new_coord = np.array([ coord[2], coord[1]+zyx_dims[2]+coord[0] ]).T
         
     elif len(coord.shape) == 2:
-        new_coord = np.array([coord[:,0], coord[:,1]+coord[:,2]*dims[1]]).T
+        new_coord = np.array([ coord[:,2], 
+                              coord[:,1]*zyx_dims[2]+coord[:,0] ]).T
     
     else: return None
+    
     return new_coord
         
 
@@ -115,7 +121,8 @@ def choosePath():
     root.withdraw()
     
     currdir = os.getcwd()
-    chosendir = filedialog.askdirectory(parent=root, initialdir=currdir, title='Please select a directory')
+    chosendir = filedialog.askdirectory(parent=root, initialdir=currdir, 
+                                        title='Please select a directory')
     if len(chosendir) > 0:
         print ("Selected Path: %s" % chosendir)
         
@@ -125,3 +132,10 @@ def wrapper(func, *args, **kwargs):
     def wrapped():
         return func(*args, **kwargs)
     return wrapped
+
+def testPointCounts(mask, point_arr):
+    vector = mask[point_arr[:,2],point_arr[:,1],point_arr[:,0]]
+    
+    return np.sum(vector)
+        
+        

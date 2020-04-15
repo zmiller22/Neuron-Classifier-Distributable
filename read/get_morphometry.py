@@ -53,6 +53,14 @@ class NeuronGroup:
         pass
     
     def getSpatialData():
+        
+        ## Get soma xyz coord
+        
+        ## Get mask termination point counts
+        # Read in the masks
+        # 
+        
+        # 
         pass
         
     def loadExternalMorphometry():
@@ -94,11 +102,12 @@ def getNeuriteTerminationPoints(nrn_df):
     
     return end_points    
 
-def getMaskPointCounts(point_arr, mask, dims):
+def getMaskPointCounts(point_arr, mask, zyx_dims):
     # Given an nx3 array of points and a mask, gets the count of points in the mask
     # where the mask is a scipy coo sparse matrix
     mask = mask.tocsr()
-    coords = my_func.convertIndex(point_arr, dims)
+    coords = my_func.convertIndex(point_arr, zyx_dims)
+    #print(coords)
     # point_count = 0
     point_count = np.sum(mask[coords[:,0],coords[:,1]])
     
@@ -108,7 +117,8 @@ def getMaskPointCounts(point_arr, mask, dims):
     
     return point_count
 
-def getNeuriteTerminationCounts(nrn_dict, mask_dict, dims):
+def getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims):
+    #TODO document and comment
     # take in a nrn_dict and a mask_dict and find the number of termination
     # points in each part of the mask, and add that to a df
     
@@ -119,38 +129,38 @@ def getNeuriteTerminationCounts(nrn_dict, mask_dict, dims):
     # Create an empty dataframe
     NTC_df = pd.DataFrame(np.nan, index=list(nrn_dict.keys()),
                           columns=list(mask_dict.keys()))
-    print(NTC_df)
     
+    #test_list = []
     # Get a dict of all neuron names and end points
     end_point_dict = {}
     for key in nrn_dict.keys():
-        #print(key)
         end_points = getNeuriteTerminationPoints(nrn_dict[key])
         end_points = np.around(end_points).astype(int)
+        #test_list.append(end_points.shape[0])
         
         # Limit indexing to the dimensions of the image so index errors are not
         # thrown for poorly registered neurons, alternatively can clean all 
         # neuron files before hand so no bad ones make it, but this may bias
         # for neurons that are not near the edges of the image
-        end_points = my_func.trimIndexRange(end_points, dims)
+        end_points = my_func.trimIndexRange(end_points, zyx_dims)
+        #print(end_points)
         
         end_point_dict.update( {key : end_points} )
         
     # Iterate over each mask and add the resulting values to a dataframe
-    test_list = []
-    i=0
+    #i=0
+    #TODO use map or something to optimize this for speed
     for mask_key in mask_dict.keys():
         mask_arr = mask_dict[mask_key]
         for end_points_key in end_point_dict.keys():
-            i+=1
+            #i+=1
             end_points = end_point_dict[end_points_key]
-            point_count = getMaskPointCounts(end_points, mask_arr, dims)
-            print(f'iteration {i}')
-            print(point_count)
-            test_list.append(point_count)
+            point_count = getMaskPointCounts(end_points, mask_arr, zyx_dims)
+            #print(f'iteration {i}')
+            #print(point_count)
             NTC_df.at[end_points_key, mask_key] = point_count
     
-    return test_list, NTC_df
+    return NTC_df #, test_list
     
 
 #%% Functionality when run as a script
@@ -174,6 +184,12 @@ if __name__ == '__main__':
     if args['output_file'] == None:
         args['output_file'] = my_func.choosePath()
         
+        
+## Notes
+# Neuron projection counts are incorrect for some neurons because they are being
+# truncated and moved towards the border of the image. Either I have something
+# wrong with my dimensions/truncating function or the neurons are not alligned
+# well
         
         
         
