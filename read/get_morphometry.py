@@ -17,6 +17,11 @@ import os
 import argparse
 import timeit
 
+import skimage as si
+import skimage.io
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 
 import read.helper_functions as my_func
 
@@ -77,25 +82,37 @@ def getSomaPoint(nrn_df):
     dataframe
     
     Args:
-        file_path (str): path to the swc file
+        nrn_df (DataFrame): pandas DataFrame of a swc file
 
     Returns:
-        list: numpy array formatted as [x,y,z]
+        soma_point (array): numpy array formatted as [x,y,z]
     
     """
     
     # Get all rows containing soma points and find the average of the points
     soma_rows = nrn_df.loc[nrn_df.iloc[:,1] == 1].values
+    print(soma_rows)
     soma_point = np.mean(soma_rows, axis=0)[2:5]
     
     return soma_point
 
 def getNeuriteTerminationPoints(nrn_df):
-    #TODO document
+    """Returns an nx3 array of the (x,y,z) coordinates for all neurite end
+    points of a neuron swc file dataframe
+    
+    Args:
+        nrn_df (DataFrame): pandas DataFrame of a swc file
+        
+    Returns:
+        end_points (array): nx3 numpy array of point coordinates
+    """
+    
+    # Get all parent and child nodes
     values = nrn_df.values
     sample_nums = values[:,0]
     parent_nums = values[:,6]
     
+    # Find all nodes with no child and get their coordinates
     end_point_rows = np.setdiff1d(sample_nums, parent_nums)
     end_point_idxs = np.nonzero(np.in1d(sample_nums, end_point_rows))[0]
     end_points = values[end_point_idxs, 2:5]
@@ -103,17 +120,27 @@ def getNeuriteTerminationPoints(nrn_df):
     return end_points    
 
 def getMaskPointCounts(point_arr, mask, zyx_dims):
+    """Returns the number of points located in a specific mask.
+    
+    Args:
+        point_arr (array): nx3 array of (x,y,z) coordinates
+        mask (COO sparse array): sparse array of mask values
+        zyx_dims (1x3 iterable): iterable of original 3d mask dimensions in 
+                                 reverse order (z,y,x)
+                                 
+    Returns:
+        point_count (int): number of points in the mask region
+        
+        """
     # Given an nx3 array of points and a mask, gets the count of points in the mask
     # where the mask is a scipy coo sparse matrix
+    
+    # Convert mask to csr and convert 3d coordinates to be compatable with
+    # indexing 2d reshaped sparse array
     mask = mask.tocsr()
     coords = my_func.convertIndex(point_arr, zyx_dims)
-    #print(coords)
-    # point_count = 0
+
     point_count = np.sum(mask[coords[:,0],coords[:,1]])
-    
-    
-    # for coord in my_func.convertIndex(point_arr, dims):
-    #     point_count += mask[coord[0], coord[1]]
     
     return point_count
 
@@ -130,13 +157,13 @@ def getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims):
     NTC_df = pd.DataFrame(np.nan, index=list(nrn_dict.keys()),
                           columns=list(mask_dict.keys()))
     
-    #test_list = []
+    test_list = []
     # Get a dict of all neuron names and end points
     end_point_dict = {}
     for key in nrn_dict.keys():
         end_points = getNeuriteTerminationPoints(nrn_dict[key])
         end_points = np.around(end_points).astype(int)
-        #test_list.append(end_points.shape[0])
+        test_list.append(end_points.shape[0])
         
         # Limit indexing to the dimensions of the image so index errors are not
         # thrown for poorly registered neurons, alternatively can clean all 
@@ -148,19 +175,67 @@ def getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims):
         end_point_dict.update( {key : end_points} )
         
     # Iterate over each mask and add the resulting values to a dataframe
-    #i=0
+    i=0
     #TODO use map or something to optimize this for speed
     for mask_key in mask_dict.keys():
         mask_arr = mask_dict[mask_key]
         for end_points_key in end_point_dict.keys():
-            #i+=1
+            i+=1
             end_points = end_point_dict[end_points_key]
             point_count = getMaskPointCounts(end_points, mask_arr, zyx_dims)
-            #print(f'iteration {i}')
+            print(f'iteration {i}')
             #print(point_count)
             NTC_df.at[end_points_key, mask_key] = point_count
     
-    return NTC_df #, test_list
+    return NTC_df, test_list
+
+def plotMaskWithNeuronPoints(nrn_df, mask_path=None):
+    
+    if mask_path==None:
+        pass
+    
+    else:
+        # Get nonzero mask coordinates
+        mask = si.io.imread(mask_path).astype(bool)
+        zyx_dims = mask.shape
+        z,y,x = np.where(mask==1)
+        mask_coords = np.vstack( (x,y,z) ).T
+        print(mask_coords)
+        
+        # Get proccessed neurite point coordinates
+        neurite_points = getNeuriteTerminationPoints(nrn_df)
+        neurite_points = np.around(neurite_points).astype(int)
+        neurite_points = my_func.trimIndexRange(neurite_points, zyx_dims)
+        
+        all_coords = np.vstack( (mask_coords, neurite_points) )
+        all_coords_num = all_coords.shape[0]
+        unique_coords_num = np.unique(all_coords, axis=0).shape[0]
+
+        total_points = all_coords_num-unique_coords_num
+        
+        
+        
+    
+    return total_points
+
+def loadTestData():
+    nrn_group = NeuronGroup()
+    nrn_group.loadNeurons('/home/zack/Desktop/Lab_Work/Data/neuron_morphologies/Zebrafish/aligned_040120/test_neurons')
+    nrn_dict = nrn_group.nrn_dict
+    nrn_dict_keys = list(nrn_dict.keys())
+    mask_dict, zyx_dims = my_func.getMasksFromDir('/home/zack/Desktop/Lab_Work/Data/masks/mpin_michael_masks')
+    test_df, test_list = getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims)
+    
+    return nrn_dict, nrn_dict_keys, test_df, test_list
+# def testNeuronPointFunctions(mask_dir, neuron_path):
+    
+#     # Load a neuron group object
+#     nrn_group = NeruonGroup()
+#     nrn_group.loadNeurons(neuron_dir)
+#     nrn_dict = nrn_group.nrn_dict
+#     nrn_keys = list(nrn_dict.keys())
+    
+#     pass
     
 
 #%% Functionality when run as a script

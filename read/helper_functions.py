@@ -45,7 +45,7 @@ def getFilenames(dir_path, remove_file_ext=False):
             
     return filename_list
 
-def getMasks(mask_dir_path):
+def getMasksFromDir(mask_dir_path):
     #TODO parallalize and optimize for load speed
     #TODO document
     
