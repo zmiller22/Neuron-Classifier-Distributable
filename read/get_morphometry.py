@@ -41,38 +41,57 @@ class NeuronGroup:
             nrn_name = os.path.splitext(filename)[0]
             nrn_df = pd.read_csv(file_path, header=None, comment='#',
                                  delim_whitespace=True)
-            self.nrn_dict.update( {nrn_name : nrn_df} )
+            self.nrn_dict.update({nrn_name : nrn_df})
             
     def loadNeuron(self, file_path, nrn_name=None):
         #TODO give option to specify neuron name
         #TODO document
-        nrn_name = os.path.splitext(os.path.basename(file_path))[0]
+        nrn_name = os.path.splitext( os.path.basename(file_path) )[0]
         nrn_df = pd.read_csv(file_path, header=None, comment="#",
                          delim_whitespace=True)
-        self.nrn_dict.update( {nrn_name : nrn_df} )
+        self.nrn_dict.update({nrn_name : nrn_df})
         
     def getLMeasureData():
-        #TODO This should be a command that gets all of the morphometry
+        #TODO This should be a command that gets all of the L-measure morphometry
         # data for this NeuronGroup and returns a nice dataframe or combines
         # it by row name with an existing morphometry dataframe
         pass
     
-    def getSpatialData():
+    def getSpatialData(self, mask_dir_path, all_nrns=True, return_masks=False):
+        #TODO add option to limit to a subset of neurons via a name list
         
-        ## Get soma xyz coord
+        # Load masks
+        mask_dict, zyx_dims = my_func.getMasksFromDir(mask_dir_path)
         
-        ## Get mask termination point counts
-        # Read in the masks
-        # 
+        # Get soma df
+        soma_df = getSomaPoints(self.nrn_dict)
         
-        # 
-        pass
+        # Get neurite counts for mask regions
+        neurite_region_count_df = getNeuriteTerminationCounts(self.nrn_dict, 
+                                                              mask_dict, zyx_dims)
+        
+        # Combine the data into one df
+        spatial_df = pd.concat([soma_df, neurite_region_count_df], axis=1, sort=False)
+        
+        # Update morphometry data
+        if self.morphometry_data == None:
+            self.morphometry_data = spatial_df
+            
+        else:
+            new_df = pd.concat([self.morphometry_data, spatial_df], axis=1, sort=False)
+            self.morphometry_data = new_df
+            
+        return None
         
     def loadExternalMorphometry():
         #TODO write a function that allows users to either set the morphometry
         # data to be an external dataframe (if morphometry_data==None) or 
         # combine the external morphometry data with the current morphometry
         # data by row name
+        pass
+    
+    def saveMorphometryData():
+        #TODO make a funciton for saving morphometry data to a csv
         pass
 
         
@@ -90,10 +109,26 @@ def getSomaPoint(nrn_df):
     
     # Get all rows containing soma points and find the average of the points
     soma_rows = nrn_df.loc[nrn_df.iloc[:,1] == 1].values
-    print(soma_rows)
     soma_point = np.mean(soma_rows, axis=0)[2:5]
     
     return soma_point
+
+def getSomaPoints(nrn_dict):
+    """Should return a data frame of soma points for a dict of neurons"""
+    #TODO document
+    soma_point_dict = {}
+    
+    for key in nrn_dict.keys():
+        nrn_df = nrn_dict[key]
+        soma_point = getSomaPoint(nrn_df)
+        soma_point_dict.update({key : soma_point})
+        
+    col_lbls = ['SomaX','SomaY','SomaZ']
+    soma_point_df = pd.DataFrame.from_dict(soma_point_dict, orient='index',
+                                           columns=col_lbls)
+        
+    return soma_point_df
+    
 
 def getNeuriteTerminationPoints(nrn_df):
     """Returns an nx3 array of the (x,y,z) coordinates for all neurite end
@@ -125,11 +160,10 @@ def getMaskPointCounts(point_arr, mask, zyx_dims):
         point_arr (array): nx3 array of (x,y,z) coordinates
         mask (COO sparse array): sparse array of mask values
         zyx_dims (1x3 iterable): iterable of original 3d mask dimensions in 
-                                 reverse order (z,y,x)
+                                  reverse order (z,y,x)
                                  
     Returns:
         point_count (int): number of points in the mask region
-        
         """
     # Given an nx3 array of points and a mask, gets the count of points in the mask
     # where the mask is a scipy coo sparse matrix
@@ -146,50 +180,48 @@ def getMaskPointCounts(point_arr, mask, zyx_dims):
 def getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims):
     """Given a dictionary of neurons, a dictionary of masks, and the [z,y,x]
     dimensions of the mask volumes, calculates the number of neurites terminating
-    in each of the mask regions for every neuron, and stores into """
-    #TODO document and comment
-    # take in a nrn_dict and a mask_dict and find the number of termination
-    # points in each part of the mask, and add that to a df
+    in each of the mask regions for every neuron, and stores into a dataframe
     
-    # Get a dict of neurite terminations points embedded into a sparse matrix
-    # this is wayyyyy to slow. Also, it looks like either I am doing something
-    # wrong with pixel/real space coordinate differences. 
+    Args:
+        nrn_dict (dict): a dictionary of neurons
+        mask_dict (dict): a dictionary of masks
+        zyx_dims (array_like): an array contiaing the dimensions of the mask
+                               volumes formated [z,y,x]
+                               
+    Returns:
+        NTC_df (DataFrame): pandas DataFrame with rows being individual neurons
+                            and columns being the number of neurites terminating
+                            in that columns mask region
+        """
     
     # Create an empty dataframe
     NTC_df = pd.DataFrame(np.nan, index=list(nrn_dict.keys()),
                           columns=list(mask_dict.keys()))
     
-    test_list = []
     # Get a dict of all neuron names and end points
     end_point_dict = {}
     for key in nrn_dict.keys():
         end_points = getNeuriteTerminationPoints(nrn_dict[key])
         end_points = np.around(end_points).astype(int)
-        test_list.append(end_points.shape[0])
         
         # Limit indexing to the dimensions of the image so index errors are not
         # thrown for poorly registered neurons, alternatively can clean all 
         # neuron files before hand so no bad ones make it, but this may bias
         # for neurons that are not near the edges of the image
-        end_points = my_func.trimIndexRange(end_points, zyx_dims)
-        #print(end_points)
-        
-        end_point_dict.update( {key : end_points} )
+        end_points = my_func.trimIndexRange(end_points, zyx_dims)    
+        end_point_dict.update({key : end_points})
         
     # Iterate over each mask and add the resulting values to a dataframe
-    i=0
     #TODO use map or something to optimize this for speed
     for mask_key in mask_dict.keys():
         mask_arr = mask_dict[mask_key]
+
         for end_points_key in end_point_dict.keys():
-            i+=1
             end_points = end_point_dict[end_points_key]
             point_count = getMaskPointCounts(end_points, mask_arr, zyx_dims)
-            print(f'iteration {i}')
-            #print(point_count)
             NTC_df.at[end_points_key, mask_key] = point_count
     
-    return NTC_df, test_list
+    return NTC_df
 
 def plotMaskWithNeuronPoints(nrn_df, mask_path=None):
     
@@ -202,7 +234,6 @@ def plotMaskWithNeuronPoints(nrn_df, mask_path=None):
         zyx_dims = mask.shape
         z,y,x = np.where(mask==1)
         mask_coords = np.vstack( (x,y,z) ).T
-        print(mask_coords)
         
         # Get proccessed neurite point coordinates
         neurite_points = getNeuriteTerminationPoints(nrn_df)
