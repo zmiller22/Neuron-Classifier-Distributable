@@ -86,7 +86,6 @@ def getSomaPoint(nrn_df):
 
     Returns:
         soma_point (array): numpy array formatted as [x,y,z]
-    
     """
     
     # Get all rows containing soma points and find the average of the points
@@ -145,6 +144,9 @@ def getMaskPointCounts(point_arr, mask, zyx_dims):
     return point_count
 
 def getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims):
+    """Given a dictionary of neurons, a dictionary of masks, and the [z,y,x]
+    dimensions of the mask volumes, calculates the number of neurites terminating
+    in each of the mask regions for every neuron, and stores into """
     #TODO document and comment
     # take in a nrn_dict and a mask_dict and find the number of termination
     # points in each part of the mask, and add that to a df

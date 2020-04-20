@@ -29,7 +29,7 @@ def getFilenames(dir_path, remove_file_ext=False):
         from the filenames (default=Fase)
         
     Returns:
-        list: list containing the filenames as strings
+        filename_list (list): list containing the filenames as strings
     """
     filename_list = []
     
@@ -46,8 +46,16 @@ def getFilenames(dir_path, remove_file_ext=False):
     return filename_list
 
 def getMasksFromDir(mask_dir_path):
-    #TODO parallalize and optimize for load speed
-    #TODO document
+    """Loads all the masks in the given directory into sparse arrays
+    and returns them as a dict along with their dimensions
+    
+    Args: 
+        mask_dir_path (str): path to directory containing masks
+        
+    Returns:
+        mask_dict (dict): dict containing mask name : sparse mask pairs
+        original_dims (array): array of the mask dimensions formatted [z,y,x]
+    """
     
     mask_dict = {}
     original_dims = 0
@@ -65,50 +73,59 @@ def getMasksFromDir(mask_dir_path):
             if original_dims==0:
                 original_dims = mask.shape
             
-            # Store the mask as a sparse matrix, reshaping first if necessary
+            # Reshape the mask into a 2d array and save as a sparse array
             mask = sparse.coo_matrix(mask.reshape(mask.shape[0],-1))
             
-            #TODO trim the file extension off of filename
             mask_dict.update( {mask_name : mask } )
     
     return mask_dict, original_dims
 
-def trimIndexRange(array, zyx_dims):
-    # Edit all elements of an input nx3 array such that each row of the array
-    # will be valid (x,y,z) indices for an image with zyx_dims
-    #TODO comment and document
+def trimIndexRange(coord, zyx_dims):
+    """Given a nx3 array of indices and an array of [z,y,x] dimensions, trim
+    the indices such that all are in a valid range according to the dimensions
     
+    Args:
+        coord (array): nx3 array with rows being 3d array indices
+        zyx_dims (array_like): array of dimensions formatted [z,y,x]
+        
+    Returns:
+        coord (array): idx_array trimmed to be in valid range"""
+    
+    # Get the dimensions in [x,y,z] order
     idx_cap = zyx_dims[::-1]
     
     # Rescale all high elements
-    for i in range(array.shape[1]):
+    for i in range(coord.shape[1]):
         cap = idx_cap[i]
-        array[ array[:,i]>=cap ] = cap-1
+        coord[ coord[:,i]>=cap ] = cap-1
         # high_idxs = array[:,i]>=cap
         # array[high_idxs,i] = cap-1
     
     # Rescale all low elements    
-    array[array<0] = 0
+    coord[coord<0] = 0
     
-    return array
+    return coord
 
 def convertIndex(coord, zyx_dims):
-    # Converts a 3d index into a 2d index to allow for indexing of flattened
-    # sparse arrays from 3d coordinate
+    """Given nx3 array of 3d [x,y,z] coordinates, converts to be compatable
+    with 2d sparse arrays reshaped from 3d arrays with dimensions [z,y,x]
     
-    # Note that you need to keep track of dims...
-    
-    # This is currently broken, tested convering 3d coords with known value into
-    # 2d coords and got back wrong value
-    
-    #TODO document
-    
+    Args:
+        coord (array): nx3 array of 3d coordinates
+        zyx_dims (array_like): array of dimensions formatted [z,y,x]
+        
+    Returns: 
+        new_coord (array): 2d coordinate that indexes the same value as the 
+                           original 3d coordinate in the 2d sparse array
+        """
+
+    # Check if this is one coordinate or multiple and perform the conversion
+    # accordingly
     if len(coord.shape) == 1:
         new_coord = np.array([ coord[2], coord[1]+zyx_dims[2]+coord[0] ]).T
         
     elif len(coord.shape) == 2:
-        new_coord = np.array([ coord[:,2], 
-                              coord[:,1]*zyx_dims[2]+coord[:,0] ]).T
+        new_coord = np.array([ coord[:,2], coord[:,1]*zyx_dims[2]+coord[:,0] ]).T
     
     else: return None
     
