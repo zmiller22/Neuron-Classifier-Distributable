@@ -6,7 +6,7 @@ Created on Tue Mar 24 14:44:00 2020
 @author: Zachary Miller
 
 Working with NeuroM version 1.4.15
-Wroking with python version 3.6+
+Working with python version 3.6+
 """
 
 import numpy as np
@@ -26,30 +26,65 @@ from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
 import read.helper_functions as my_func
 
 class NeuronGroup:
+    """Primary object for handeling neurons"""
+    
     def __init__(self):
+        """Initializes an empty NeuronGroup object
+        
+        Args:
+            None
+        """
+        
+        # dict
         self.nrn_dict = {}
         self.morphometry_data = None
         
     def loadNeurons(self, dir_path, nrn_names=None):
-    #TODO give option to specify neuron names
-    #TODO document
-    
+        """Loads all neurons located in a directory into NeuronGroup.nrn_dict
+        with key value pairs of the form {neuron name : swc file DataFrame}
+        
+        Args:
+            dir_path (str): path to direcctory containing swc files
+            nrn_names (list of strs): To be implimented later
+            
+        Returns:
+            None
+        """
+        #TODO give option to specify neuron names
+        
+        # get all filenames
         filenames = my_func.getFilenames(dir_path)
         
+        # Load all files into nrn_dict
         for filename in filenames:
             file_path = dir_path + '/' + filename
             nrn_name = os.path.splitext(filename)[0]
             nrn_df = pd.read_csv(file_path, header=None, comment='#',
                                  delim_whitespace=True)
+            
             self.nrn_dict.update({nrn_name : nrn_df})
+    
+        return None
             
     def loadNeuron(self, file_path, nrn_name=None):
+        """Load a single neuron into NeuronGroup.nrn_dict with a key value pair
+        of the form {neuron name : swc file DataFrame}
+        
+        Args: 
+            file_path (str): path to swc file to be loaded
+            nrn_name (str): To be implimented later
+            
+        Returns:
+            None"""
         #TODO give option to specify neuron name
-        #TODO document
+        
+        # Load neuron and add to nrn_dict
         nrn_name = os.path.splitext( os.path.basename(file_path) )[0]
         nrn_df = pd.read_csv(file_path, header=None, comment="#",
                          delim_whitespace=True)
         self.nrn_dict.update({nrn_name : nrn_df})
+        
+        return None
         
     def getLMeasureData():
         #TODO This should be a command that gets all of the L-measure morphometry
@@ -58,28 +93,48 @@ class NeuronGroup:
         pass
     
     def getSpatialData(self, mask_dir_path, all_nrns=True, return_masks=False):
+        """Gets all 'spatial' morphology measures. That is, the (xyz) coordinate
+        of the soma along with the counts of how many of each neuron's neurites
+        terminate each mask located in a directory. Results are put into 
+        NeruonGroup.morphometry_data
+        
+        Args: 
+            mask_dir_path (str): path to directory containing the masks
+            all_nrns (bool): To be imoplimented later
+            return_masks (bool): To be implimented later
+            
+        Returns:
+            None"""
         #TODO add option to limit to a subset of neurons via a name list
         
         # Load masks
+        print('Loading Masks...')
         mask_dict, zyx_dims = my_func.getMasksFromDir(mask_dir_path)
+        print('Done\n')
         
         # Get soma df
+        print('Finding soma points...')
         soma_df = getSomaPoints(self.nrn_dict)
+        print('Done\n')
         
         # Get neurite counts for mask regions
+        print('Calculating neurite termination counts by region...')
         neurite_region_count_df = getNeuriteTerminationCounts(self.nrn_dict, 
                                                               mask_dict, zyx_dims)
+        print('Done\n')
         
         # Combine the data into one df
         spatial_df = pd.concat([soma_df, neurite_region_count_df], axis=1, sort=False)
         
         # Update morphometry data
+        print('Updating morphometry data...')
         if self.morphometry_data == None:
             self.morphometry_data = spatial_df
             
         else:
             new_df = pd.concat([self.morphometry_data, spatial_df], axis=1, sort=False)
             self.morphometry_data = new_df
+        print('Done')
             
         return None
         
@@ -91,7 +146,8 @@ class NeuronGroup:
         pass
     
     def saveMorphometryData():
-        #TODO make a funciton for saving morphometry data to a csv
+        #TODO make a funciton for saving morphometry data to various file
+        # formats
         pass
 
         
@@ -221,84 +277,31 @@ def getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims):
             point_count = getMaskPointCounts(end_points, mask_arr, zyx_dims)
             NTC_df.at[end_points_key, mask_key] = point_count
     
-    return NTC_df
-
-def plotMaskWithNeuronPoints(nrn_df, mask_path=None):
-    
-    if mask_path==None:
-        pass
-    
-    else:
-        # Get nonzero mask coordinates
-        mask = si.io.imread(mask_path).astype(bool)
-        zyx_dims = mask.shape
-        z,y,x = np.where(mask==1)
-        mask_coords = np.vstack( (x,y,z) ).T
-        
-        # Get proccessed neurite point coordinates
-        neurite_points = getNeuriteTerminationPoints(nrn_df)
-        neurite_points = np.around(neurite_points).astype(int)
-        neurite_points = my_func.trimIndexRange(neurite_points, zyx_dims)
-        
-        all_coords = np.vstack( (mask_coords, neurite_points) )
-        all_coords_num = all_coords.shape[0]
-        unique_coords_num = np.unique(all_coords, axis=0).shape[0]
-
-        total_points = all_coords_num-unique_coords_num
-        
-        
-        
-    
-    return total_points
-
-def loadTestData():
-    nrn_group = NeuronGroup()
-    nrn_group.loadNeurons('/home/zack/Desktop/Lab_Work/Data/neuron_morphologies/Zebrafish/aligned_040120/test_neurons')
-    nrn_dict = nrn_group.nrn_dict
-    nrn_dict_keys = list(nrn_dict.keys())
-    mask_dict, zyx_dims = my_func.getMasksFromDir('/home/zack/Desktop/Lab_Work/Data/masks/mpin_michael_masks')
-    test_df, test_list = getNeuriteTerminationCounts(nrn_dict, mask_dict, zyx_dims)
-    
-    return nrn_dict, nrn_dict_keys, test_df, test_list
-# def testNeuronPointFunctions(mask_dir, neuron_path):
-    
-#     # Load a neuron group object
-#     nrn_group = NeruonGroup()
-#     nrn_group.loadNeurons(neuron_dir)
-#     nrn_dict = nrn_group.nrn_dict
-#     nrn_keys = list(nrn_dict.keys())
-    
-#     pass
-    
+    return NTC_df    
 
 #%% Functionality when run as a script
-if __name__ == '__main__':
-    ap = argparse.ArgumentParser()
-    ap.add_argument('-d', '--neuron_directory', required=False,
-                    help='path to folder containing neuron .swc files')
-    ap.add_argument('-c', '--config_file', required=False,
-                    help="path to desired NeuroM config .yaml file")
-    ap.add_argument('-o', '--output_file', required=False,
-                    help='''path to the output file, including the file name
-                    (do not include file extension)''')
-    args = vars(ap.parse_args())
+# if __name__ == '__main__':
+#     ap = argparse.ArgumentParser()
+#     ap.add_argument('-d', '--neuron_directory', required=False,
+#                     help='path to folder containing neuron .swc files')
+#     ap.add_argument('-c', '--config_file', required=False,
+#                     help="path to desired NeuroM config .yaml file")
+#     ap.add_argument('-o', '--output_file', required=False,
+#                     help='''path to the output file, including the file name
+#                     (do not include file extension)''')
+#     args = vars(ap.parse_args())
     
-    if args['neuron_directory'] == None:
-        args['neuron_directory'] = my_func.choosePath()
+#     if args['neuron_directory'] == None:
+#         args['neuron_directory'] = my_func.choosePath()
         
-    if args['config_file'] == None:
-        args['config_file'] = my_func.choosePath()
+#     if args['config_file'] == None:
+#         args['config_file'] = my_func.choosePath()
         
-    if args['output_file'] == None:
-        args['output_file'] = my_func.choosePath()
+#     if args['output_file'] == None:
+#         args['output_file'] = my_func.choosePath()
         
         
-## Notes
-# Neuron projection counts are incorrect for some neurons because they are being
-# truncated and moved towards the border of the image. Either I have something
-# wrong with my dimensions/truncating function or the neurons are not alligned
-# well
-        
+#TODO decide on standard behavior of this file and impliment it
         
         
         

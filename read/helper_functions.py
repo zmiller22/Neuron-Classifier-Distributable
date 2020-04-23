@@ -75,8 +75,7 @@ def getMasksFromDir(mask_dir_path):
             
             # Reshape the mask into a 2d array and save as a sparse array
             mask = sparse.coo_matrix(mask.reshape(mask.shape[0],-1))
-            
-            mask_dict.update( {mask_name : mask } )
+            mask_dict.update({mask_name : mask})
     
     return mask_dict, original_dims
 
